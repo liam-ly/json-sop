@@ -37,11 +37,13 @@ instance Functor f => Functor (Partial f) where
 
 instance Functor f => Monad (Partial f) where
   return = PZero
-  fail   = Fail . return
 
   Fail e   >>= _ = Fail e
   PZero a  >>= f = f a
   PSucc fa >>= f = PSucc (fmap (>>= f) fa)
+
+instance Monad m => MonadFail (Partial m) where
+  fail = Fail . return
 
 instance (MonadPlus f, Functor f) => MonadPlus (Partial f) where
   mzero = Fail []

@@ -352,7 +352,7 @@ gupdateRecord fields lenses = withObject "Object" $ \obj -> do
 --
 -- The first form is useful when all fields of a record need to be present;
 -- the second when they are optional.
-lineup :: (Monad m, MonadPlus m', Eq a, Show a)
+lineup :: (Monad m, MonadFail m, MonadFail m', MonadPlus m', Eq a, Show a)
        => NP (K a) xs -> [(a, b)] -> m (NP (K (m' b)) xs)
 lineup Nil []   = return Nil
 lineup Nil vals = fail $ "Unexpected key(s): " ++ show (map fst vals)
@@ -363,7 +363,7 @@ lineup (K k :* ks) vs =
     Just ((_, b), vs') -> do bs <- lineup ks vs' ; return $ K (return b)     :* bs
 
 -- | Error message for a missing key (used in lineup)
-missingKey :: (Monad m, Show a) => a -> m b
+missingKey :: (Monad m, MonadFail m, Show a) => a -> m b
 missingKey k = fail $ "missing key " ++ show k
 
 -- | Remove the first element that satisfies the predicate
@@ -399,19 +399,22 @@ pu = Proxy
   Adaptation of some of Aeson's combinators
 -------------------------------------------------------------------------------}
 
-withObject :: Monad m => String -> ([(String, Value)] -> m a) -> Value -> m a
+withObject :: (Monad m, MonadFail m) => String -> ([(String, Value)] -> m a) -> Value -> m a
 withObject _        f (Object obj) = f $ map (first Text.unpack) (HashMap.toList obj)
 withObject expected _ v            = typeMismatch expected v
 
-withText :: Monad m => String -> (Text -> m a) -> Value -> m a
+withText :: (Monad m, MonadFail m) => String -> (Text -> m a) -> Value -> m a
 withText _        f (String txt) = f txt
 withText expected _ v            = typeMismatch expected v
 
-withArray :: Monad m => String -> ([Value] -> m a) -> Value -> m a
+withArray :: (Monad m, MonadFail m) => String -> ([Value] -> m a) -> Value -> m a
 withArray _         f (Array arr) = f $ Vector.toList arr
 withArray expected  _ v           = typeMismatch expected v
 
 typeMismatch :: Monad m
+#if __GLASGOW_HASKELL__ >= 88
+             => MonadFail m
+#endif
              => String -- ^ The name of the type you are trying to parse.
              -> Value  -- ^ The actual value encountered.
              -> m a
